@@ -12,6 +12,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets.data_table import ColumnKey
+from textual.widgets._footer import FooterKey
 from textual.widgets import DataTable, Footer, Header, Input, ProgressBar, Static
 
 from .api import Audible, Book
@@ -84,6 +85,16 @@ class MprisControl:
             self.app.action_toggle()
 
 
+class QuietFooter(Footer):
+    """Footer solo informativo: i click del mouse non premono tasti.
+
+    Ridimensionando la finestra (SUPER + tasto destro) il mouse passava sul footer
+    e il mouse-down su "Vel +" o "Tema" simulava il tasto."""
+
+    def on_mount(self) -> None:
+        FooterKey.on_mouse_down = lambda self: None
+
+
 class AudibleApp(App):
     TITLE = "Audible Italia"
     CSS = """
@@ -144,7 +155,7 @@ class AudibleApp(App):
             yield Static("Niente in riproduzione", id="info")
             yield ProgressBar(total=1, show_eta=False, show_percentage=False, id="bar")
             yield Static("", id="status")
-        yield Footer()
+        yield QuietFooter()
 
     def on_mount(self) -> None:
         for th in all_themes():
