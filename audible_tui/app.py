@@ -11,11 +11,13 @@ from textual.containers import Vertical
 from textual.widgets import DataTable, Footer, Header, Input, ProgressBar, Static
 
 from .api import Audible, Book
+from .mpris import Mpris, metadata as mpris_metadata
 from .config import DATA_DIR
 from .player import Player
 
 SYNC_EVERY = 30  # secondi tra due scritture del punto di ascolto
 SKIP = 30
+MEDIA_SKIP = 15  # secondi per i tasti multimediali avanti/indietro
 
 
 def hms(s: float) -> str:
@@ -25,6 +27,55 @@ def hms(s: float) -> str:
 
 def hm(minutes: int) -> str:
     return f"{minutes // 60}h{minutes % 60:02d}"
+
+
+class MprisControl:
+    """Stato e comandi che il server MPRIS chiede all'app."""
+
+    SKIP = MEDIA_SKIP
+
+    def __init__(self, app: "AudibleApp") -> None:
+        self.app = app
+
+    def active(self) -> bool:
+        return bool(self.app.player and self.app.current and self.app.player.loaded)
+
+    def status(self) -> str:
+        if not self.active():
+            return "Stopped"
+        return "Paused" if self.app.player.paused else "Playing"
+
+    def rate(self) -> float:
+        return self.app.player.speed if self.active() else 1.0
+
+    def position(self) -> float:
+        return self.app.player.position if self.active() else 0.0
+
+    def track_id(self) -> str:
+        return self.app.current.asin if self.active() else ""
+
+    def metadata(self) -> dict:
+        if not self.active():
+            return {}
+        b = self.app.current
+        return mpris_metadata(b.asin, b.title, b.authors, b.series or b.title,
+                              self.app.player.duration)
+
+    def skip(self, seconds: float) -> None:
+        if self.active():
+            self.app.player.seek(seconds)
+
+    def seek_to(self, seconds: float) -> None:
+        if self.active():
+            self.app.player.seek_to(seconds)
+
+    def set_paused(self, paused: bool) -> None:
+        if self.active() and self.app.player.paused != paused:
+            self.app.action_toggle()
+
+    def toggle(self) -> None:
+        if self.active():
+            self.app.action_toggle()
 
 
 class AudibleApp(App):
@@ -66,6 +117,7 @@ class AudibleApp(App):
         self.last_synced_pos = -1.0
         self.sleep_at: float | None = None
         self.busy: set[str] = set()
+        self.mpris = Mpris(MprisControl(self), lambda: self.call_later(self.action_quit))
         self.filter = ""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -92,7 +144,15 @@ class AudibleApp(App):
         self.fill()
         self.set_interval(1.0, self.tick)
         self.fetch_library()
+        self.start_mpris()
         t.focus()
+
+    @work(exclusive=True, group="mpris")
+    async def start_mpris(self) -> None:
+        try:
+            await self.mpris.start()
+        except Exception as e:  # niente bus di sessione: si va avanti senza tasti multimediali
+            self.status(f"MPRIS non attivo: {e}")
 
     # --- libreria -----------------------------------------------------
     @work(thread=True, exclusive=True, group="lib")
@@ -266,6 +326,7 @@ class AudibleApp(App):
     # --- tick, sincronizzazione ----------------------------------------
     def tick(self) -> None:
         info, bar = self.query_one("#info", Static), self.query_one("#bar", ProgressBar)
+        self.mpris.update()
         p, b = self.player, self.current
         if not (p and b and p.loaded):
             return
@@ -335,6 +396,7 @@ class AudibleApp(App):
         await self.workers.wait_for_complete()
         if self.player:
             self.player.close()
+        await self.mpris.stop()
         self.exit()
 
 

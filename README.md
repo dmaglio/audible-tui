@@ -50,6 +50,14 @@ registration token, not your password, in `~/.config/audible-tui/auth.json`
 | `r` | refresh library |
 | `q` | quit (writes the position first) |
 
+### Media keys (MPRIS)
+
+The player registers on the session bus as `org.mpris.MediaPlayer2.audible_tui`,
+so `playerctl` and the keyboard media keys work: play/pause, and next/previous
+which **skip 15 seconds** instead of a whole chapter. Title and author show up
+in `playerctl metadata` and in status-bar media widgets. If several players are
+running, `playerctl` picks the first one; use `-p audible_tui` to be explicit.
+
 ## Settings (environment variables)
 
 | variable | default |
