@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audible-tui"
+version = "0.1.0"
+description = "Terminal audiobook player for Audible: library, listening and position sync"
+readme = "README.md"
+license = { text = "AGPL-3.0-or-later" }
+requires-python = ">=3.11"
+dependencies = [
+  "audible>=0.13",
+  "pycryptodome>=3.20",
+  "textual>=6.0",
+  "python-mpv>=1.0.7",
+  "httpx>=0.27",
+]
+
+[project.scripts]
+audible-tui = "audible_tui.app:main"
+audible-tui-login = "audible_tui.login:main"
+
+[tool.setuptools]
+packages = ["audible_tui"]
