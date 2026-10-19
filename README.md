@@ -45,6 +45,7 @@ registration token, not your password, in `~/.config/audible-tui/auth.json`
 | Shift+← / → | −5 min / +5 min |
 | `,` / `.` | previous / next chapter |
 | `+` / `-` | speed |
+| `t` | theme: Catppuccin Latte ⇄ Frappé (remembered) |
 | `z` | sleep timer: 15 / 30 / 45 / 60 min / off |
 | `d` | download only |
 | `/` | search (Esc clears) |
@@ -65,6 +66,7 @@ running, `playerctl` picks the first one; use `-p audible_tui` to be explicit.
 |---|---|
 | `AUDIBLE_TUI_LOCALE` | `it` (also `de`, `fr`, `uk`, `us`, …) |
 | `AUDIBLE_TUI_BOOKS` | `~/Audiolibri` |
+| `AUDIBLE_TUI_DARK` | `frappe` (or `macchiato`): the dark theme the `t` key switches to |
 
 Books are saved as `<books dir>/<author>/<title> [ASIN].m4b`.
 

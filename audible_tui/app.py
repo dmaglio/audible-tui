@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 
 from rich.console import Group
@@ -19,6 +20,7 @@ from .mpris import Mpris, metadata as mpris_metadata
 from .config import DATA_DIR
 from .cover import get_cover, render
 from .player import Player
+from .themes import PALETTES, all_themes
 
 SYNC_EVERY = 30  # secondi tra due scritture del punto di ascolto
 SKIP = 15  # secondi di salto, per le frecce e per i tasti multimediali
@@ -105,6 +107,7 @@ class AudibleApp(App):
         Binding("plus", "speed(0.1)", "Vel +", key_display="+"),
         Binding("equals_sign", "speed(0.1)", show=False),
         Binding("minus", "speed(-0.1)", "Vel -", key_display="-"),
+        Binding("t", "theme", "Tema"),
         Binding("z", "sleep", "Sleep"),
         Binding("d", "download", "Scarica"),
         Binding("r", "refresh", "Aggiorna"),
@@ -143,6 +146,9 @@ class AudibleApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        for th in all_themes():
+            self.register_theme(th)
+        self.theme = f"catppuccin-{self.saved_theme()}"
         t = self.query_one("#lib", DataTable)
         t.add_column("", key="dl", width=2)
         t.add_column("Titolo", key="title", width=30)
@@ -458,6 +464,28 @@ class AudibleApp(App):
             self.call_from_thread(show)
         except RuntimeError:
             show()
+
+    # --- tema -----------------------------------------------------------
+    def saved_theme(self) -> str:
+        try:
+            name = (DATA_DIR / "theme").read_text().strip()
+        except OSError:
+            name = ""
+        return name if name in PALETTES else self.dark_name()
+
+    def dark_name(self) -> str:
+        n = os.environ.get("AUDIBLE_TUI_DARK", "frappe")
+        return n if n in PALETTES and n != "latte" else "frappe"
+
+    def action_theme(self) -> None:
+        """Alterna tra Latte (chiaro) e la variante scura."""
+        name = self.dark_name() if self.theme == "catppuccin-latte" else "latte"
+        self.theme = f"catppuccin-{name}"
+        try:
+            (DATA_DIR / "theme").write_text(name)
+        except OSError:
+            pass
+        self.status(f"Tema: Catppuccin {name.capitalize()}")
 
     def action_refresh(self) -> None:
         self.fetch_library()
