@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 
 from rich.console import Group
@@ -156,6 +157,20 @@ class AudibleApp(App):
             yield ProgressBar(total=1, show_eta=False, show_percentage=False, id="bar")
             yield Static("", id="status")
         yield QuietFooter()
+
+    async def on_event(self, event: events.Event) -> None:
+        # diagnostica: AUDIBLE_TUI_DEBUG=1 scrive tasti, mouse e azioni in debug.log
+        if os.environ.get("AUDIBLE_TUI_DEBUG") and isinstance(
+                event, (events.Key, events.MouseDown, events.MouseUp, events.Resize, events.Paste)):
+            with open(DATA_DIR / "debug.log", "a") as f:
+                f.write(f"{time.strftime('%H:%M:%S')} {event!r}\n")
+        await super().on_event(event)
+
+    async def run_action(self, action, *args, **kwargs):
+        if os.environ.get("AUDIBLE_TUI_DEBUG"):
+            with open(DATA_DIR / "debug.log", "a") as f:
+                f.write(f"{time.strftime('%H:%M:%S')} ACTION {action}\n")
+        return await super().run_action(action, *args, **kwargs)
 
     def on_mount(self) -> None:
         for th in all_themes():
