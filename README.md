@@ -6,7 +6,7 @@ Audible Italia (marketplace `it`) but usable with any marketplace the
 
 - browse your library (title, author, series, length, progress, downloaded)
 - download a book once, decrypt it locally to M4B (chapters and cover kept)
-- listen with mpv: chapters, speed, ±30 s / ±5 min, sleep timer
+- listen with mpv: chapters, speed, ±15 s / ±5 min, sleep timer
 - **listening position synced with Audible**: it resumes from where the web
   player or the phone app left you, and writes it back every 30 seconds, on
   pause and on exit
@@ -40,7 +40,7 @@ registration token, not your password, in `~/.config/audible-tui/auth.json`
 |---|---|
 | Enter | play (downloads first if needed) |
 | Space | pause |
-| ← / → (h / l) | −30 s / +30 s |
+| ← / → (h / l) | −15 s / +15 s |
 | Shift+← / → | −5 min / +5 min |
 | `,` / `.` | previous / next chapter |
 | `+` / `-` | speed |
@@ -54,7 +54,7 @@ registration token, not your password, in `~/.config/audible-tui/auth.json`
 
 The player registers on the session bus as `org.mpris.MediaPlayer2.audible_tui`,
 so `playerctl` and the keyboard media keys work: play/pause, and next/previous
-which **skip 15 seconds** instead of a whole chapter. Title and author show up
+which skip 15 seconds (same as the arrow keys) instead of a whole chapter. Title and author show up
 in `playerctl metadata` and in status-bar media widgets. If several players are
 running, `playerctl` picks the first one; use `-p audible_tui` to be explicit.
 

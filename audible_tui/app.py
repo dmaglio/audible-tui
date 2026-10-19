@@ -16,8 +16,7 @@ from .config import DATA_DIR
 from .player import Player
 
 SYNC_EVERY = 30  # secondi tra due scritture del punto di ascolto
-SKIP = 30
-MEDIA_SKIP = 15  # secondi per i tasti multimediali avanti/indietro
+SKIP = 15  # secondi di salto, per le frecce e per i tasti multimediali
 
 
 def hms(s: float) -> str:
@@ -32,7 +31,7 @@ def hm(minutes: int) -> str:
 class MprisControl:
     """Stato e comandi che il server MPRIS chiede all'app."""
 
-    SKIP = MEDIA_SKIP
+    SKIP = SKIP
 
     def __init__(self, app: "AudibleApp") -> None:
         self.app = app
@@ -90,8 +89,8 @@ class AudibleApp(App):
     BINDINGS = [
         Binding("enter", "play", "Ascolta", show=True),
         Binding("space", "toggle", "Pausa"),
-        Binding("left,h", "seek(-30)", "-30s", show=False),
-        Binding("right,l", "seek(30)", "+30s", show=False),
+        Binding("left,h", "seek(-15)", "-15s", show=False),
+        Binding("right,l", "seek(15)", "+15s", show=False),
         Binding("shift+left,H", "seek(-300)", "-5m", show=False),
         Binding("shift+right,L", "seek(300)", "+5m", show=False),
         Binding("comma", "chapter(-1)", "Cap. prec.", show=False),
