@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 
 from rich.console import Group
@@ -474,11 +473,10 @@ class AudibleApp(App):
         return name if name in PALETTES else self.dark_name()
 
     def dark_name(self) -> str:
-        n = os.environ.get("AUDIBLE_TUI_DARK", "frappe")
-        return n if n in PALETTES and n != "latte" else "frappe"
+        return "macchiato"
 
     def action_theme(self) -> None:
-        """Alterna tra Latte (chiaro) e la variante scura."""
+        """Alterna tra Latte (chiaro) e Macchiato (scuro)."""
         name = self.dark_name() if self.theme == "catppuccin-latte" else "latte"
         self.theme = f"catppuccin-{name}"
         try:
