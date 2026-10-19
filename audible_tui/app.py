@@ -164,7 +164,29 @@ class AudibleApp(App):
                 event, (events.Key, events.MouseDown, events.MouseUp, events.Resize, events.Paste)):
             with open(DATA_DIR / "debug.log", "a") as f:
                 f.write(f"{time.strftime('%H:%M:%S')} {event!r}\n")
+        if isinstance(event, events.Key) and self.swallow_osc(event):
+            return
         await super().on_event(event)
+
+    _osc_since = 0.0   # inizio di una sequenza OSC non riconosciuta (0 = nessuna)
+    _osc_prev = ""
+
+    def swallow_osc(self, ev: events.Key) -> bool:
+        """Scarta le sequenze OSC che kitty manda sul mouse (ESC ] 72 ; t=o:x=..: ... ESC \\).
+
+        Textual non le riconosce e le consegna come tasti: i caratteri "t" e "="
+        cambiavano tema e velocità."""
+        ch, now = ev.character or "", time.monotonic()
+        if self._osc_since and now - self._osc_since > 0.5:
+            self._osc_since = 0.0
+        if not self._osc_since and self._osc_prev == "^" and ch == "]":
+            self._osc_since = now
+        self._osc_prev = ch
+        if self._osc_since:
+            if ch == "\\":
+                self._osc_since = 0.0
+            return True
+        return False
 
     async def run_action(self, action, *args, **kwargs):
         if os.environ.get("AUDIBLE_TUI_DEBUG"):
