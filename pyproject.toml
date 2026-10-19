@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "audible-tui"
-version = "0.1.0"
+version = "0.2.0"
 description = "Terminal audiobook player for Audible: library, listening and position sync"
 readme = "README.md"
 license = { text = "AGPL-3.0-or-later" }
