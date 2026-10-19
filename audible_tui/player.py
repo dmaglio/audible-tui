@@ -86,6 +86,7 @@ class Player:
         self.mpv.volume = min(max((self.mpv.volume or 100) + delta, 0), 130)
 
     def close(self) -> None:
+        self.loaded = False
         try:
             self.mpv.terminate()
         except Exception:

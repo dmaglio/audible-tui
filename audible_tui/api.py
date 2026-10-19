@@ -135,6 +135,12 @@ class Audible:
         except (OSError, ValueError):
             return {}
 
+    def send_stats(self, events: list[dict]) -> None:
+        if events:
+            self.client.put("1.0/stats/events", body={
+                "stats": events,
+                "device_type_id": self.auth.device_info.get("device_type", "")})
+
     # --- download --------------------------------------------------------
     def license(self, asin: str):
         body = {"supported_drm_types": ["Mpeg", "Adrm"], "quality": "High",
@@ -143,8 +149,11 @@ class Audible:
         r = self.client.post(f"1.0/content/{asin}/licenserequest", body=body)
         cl = r["content_license"]
         md = cl["content_metadata"]
+        info = md.get("chapter_info", {})
         meta = {"acr": md["content_reference"]["acr"],
-                "chapters": md.get("chapter_info", {}).get("chapters", [])}
+                "license_id": cl.get("license_id", ""),
+                "length_ms": info.get("runtime_length_ms", 0),
+                "chapters": info.get("chapters", [])}
         (META_DIR / f"{asin}.json").write_text(json.dumps(meta))
         return r, meta
 

@@ -19,6 +19,7 @@ from .mpris import Mpris, metadata as mpris_metadata
 from .config import DATA_DIR
 from .cover import get_cover, render
 from .player import Player
+from .stats import ListeningSession
 from .themes import PALETTES, all_themes
 
 SYNC_EVERY = 30  # secondi tra due scritture del punto di ascolto
@@ -127,6 +128,7 @@ class AudibleApp(App):
         self.sleep_at: float | None = None
         self.busy: set[str] = set()
         self._side_key: tuple | None = None
+        self.session: ListeningSession | None = None
         self.mpris = Mpris(MprisControl(self), lambda: self.call_later(self.action_quit))
         self.filter = ""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -363,6 +365,7 @@ class AudibleApp(App):
 
     def start(self, b: Book) -> None:
         self.flush_position()
+        self.stats_close()
         if self.player is None:
             self.player = Player()
         self.current = b
@@ -373,6 +376,7 @@ class AudibleApp(App):
         self.last_sync = time.monotonic()
         self.last_synced_pos = -1
         self.update_side()
+        self.begin_session(b)
         self.status(f"Riprendo da {hms(ms / 1000)}" if ms else "Parto dall'inizio")
 
     def action_toggle(self) -> None:
@@ -430,9 +434,11 @@ class AudibleApp(App):
             f"{hms(pos)} / {hms(dur)}   {p.speed:g}x{sleep}")
         if time.monotonic() - self.last_sync >= SYNC_EVERY and not p.paused:
             self.flush_position()
+        self.stats_tick()
         if p.ended and not b.finished:
             b.finished = True
             self.flush_position(final=True)
+            self.stats_close(finished=True)
 
     def flush_position(self, final: bool = False) -> None:
         p, b = self.player, self.current
@@ -448,6 +454,46 @@ class AudibleApp(App):
             b.percent = pos / p.duration * 100
             self.refresh_row(b)
         self.push(b.asin, int(pos * 1000))
+
+    # --- eventi di ascolto (barra di avanzamento di Audible) --------------
+    @work(thread=True, group="session")
+    def begin_session(self, b: Book) -> None:
+        try:
+            meta = self.api.meta(b.asin)
+            if not meta.get("license_id"):
+                _, meta = self.api.license(b.asin)
+            length = meta.get("length_ms") or int((self.player.duration if self.player else 0) * 1000)
+            session = ListeningSession(b.asin, meta.get("license_id", ""), length)
+        except Exception as e:
+            self.status(f"Eventi di ascolto non attivi: {e}")
+            return
+        if self.current and self.current.asin == b.asin:
+            self.session = session
+
+    @work(thread=True, group="stats")
+    def send_stats(self, events: list[dict]) -> None:
+        try:
+            self.api.send_stats(events)
+        except Exception as e:
+            self.status(f"Eventi di ascolto non inviati: {e}")
+
+    def stats_tick(self) -> None:
+        p, ss = self.player, self.session
+        if not (p and ss and self.current and ss.asin == self.current.asin and p.loaded):
+            return
+        evs = ss.tick(p.position * 1000, not p.paused and not p.ended, p.speed)
+        if evs:
+            self.send_stats(evs)
+
+    def stats_close(self, finished: bool = False) -> None:
+        p, ss = self.player, self.session
+        if not (p and ss and p.loaded):
+            return
+        evs = ss.end(p.position * 1000, p.speed)
+        if finished:
+            evs += ss.finished(p.speed)
+        if evs:
+            self.send_stats(evs)
 
     @work(thread=True, group="sync")
     def push(self, asin: str, ms: int) -> None:
@@ -491,11 +537,12 @@ class AudibleApp(App):
     # --- uscita -------------------------------------------------------
     async def action_quit(self) -> None:
         self.flush_position()
+        self.stats_close()
         # il thread di push è daemon-ish: aspetto che finisca prima di uscire
         await self.workers.wait_for_complete()
+        await self.mpris.stop()
         if self.player:
             self.player.close()
-        await self.mpris.stop()
         self.exit()
 
 
