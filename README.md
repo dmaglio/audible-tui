@@ -69,6 +69,35 @@ running, `playerctl` picks the first one; use `-p audible_tui` to be explicit.
 
 Books are saved as `<books dir>/<author>/<title> [ASIN].m4b`.
 
+## To do / known gaps
+
+Things still open, to tick off as they get done or verified:
+
+- [ ] **Progress bar / percentage on Audible.** The listening position syncs and
+  the book shows up in "Continue listening", but `percent_complete` stays at 0
+  in the library, so the official apps show no progress bar. The listening
+  events (`StartListening`, `Listening`) are sent in the same format as the web
+  player and accepted by the server; it is not known whether they are enough,
+  or whether the server recomputes the value very late. Checked about 1 hour
+  after playback: still 0.
+- [ ] Verify the `MarkAsFinished` event: its format is a guess (never captured
+  from an official client), so "finished" may not register.
+- [ ] Capture the events of the official mobile app (not only the web player)
+  to compare, in case the progress bar is driven by something else.
+- [ ] No queue for offline use: position and events are dropped if the network
+  is down at that moment, instead of being retried later.
+- [ ] No conflict handling: if the position changes on another device while
+  you are playing here, the next write overwrites it.
+- [ ] Access-token refresh happens only at startup; very long sessions may need
+  a restart.
+- [ ] Manual "mark as finished / unfinished" from the library.
+- [ ] Delete a downloaded book from the app (free disk space).
+- [ ] Jump to a chapter from a list, not only previous / next.
+- [ ] Volume keys (only the system volume works for now).
+- [ ] Remember the playback speed per book.
+- [ ] Desktop entry and a floating-window rule for tiling window managers.
+- [ ] Automated tests (everything was checked by hand against a real account).
+
 ## Notes
 
 - This tool is for listening to audiobooks **you have bought**, on your own
