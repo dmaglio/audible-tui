@@ -4,15 +4,20 @@ from __future__ import annotations
 import json
 import time
 
-from textual import on, work
+from rich.console import Group
+from rich.text import Text
+
+from textual import events, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
+from textual.widgets.data_table import ColumnKey
 from textual.widgets import DataTable, Footer, Header, Input, ProgressBar, Static
 
 from .api import Audible, Book
 from .mpris import Mpris, metadata as mpris_metadata
 from .config import DATA_DIR
+from .cover import get_cover, render
 from .player import Player
 
 SYNC_EVERY = 30  # secondi tra due scritture del punto di ascolto
@@ -80,7 +85,9 @@ class MprisControl:
 class AudibleApp(App):
     TITLE = "Audible Italia"
     CSS = """
-    #lib { height: 1fr; }
+    #main { height: 1fr; }
+    #lib { width: 1fr; height: 1fr; }
+    #side { width: 44; height: 1fr; border-left: solid $primary; padding: 0 1; }
     #search { display: none; }
     #search.on { display: block; }
     #now { height: 5; border-top: solid $primary; padding: 0 1; }
@@ -117,6 +124,7 @@ class AudibleApp(App):
         self.last_synced_pos = -1.0
         self.sleep_at: float | None = None
         self.busy: set[str] = set()
+        self._side_key: tuple | None = None
         self.mpris = Mpris(MprisControl(self), lambda: self.call_later(self.action_quit))
         self.filter = ""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -125,7 +133,9 @@ class AudibleApp(App):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Input(placeholder="Cerca titolo, autore, serie…", id="search")
-        yield DataTable(id="lib", cursor_type="row", zebra_stripes=True)
+        with Horizontal(id="main"):
+            yield DataTable(id="lib", cursor_type="row", zebra_stripes=True)
+            yield Static("", id="side")
         with Vertical(id="now"):
             yield Static("Niente in riproduzione", id="info")
             yield ProgressBar(total=1, show_eta=False, show_percentage=False, id="bar")
@@ -135,9 +145,9 @@ class AudibleApp(App):
     def on_mount(self) -> None:
         t = self.query_one("#lib", DataTable)
         t.add_column("", key="dl", width=2)
-        t.add_column("Titolo", key="title", width=44)
-        t.add_column("Autore", key="author", width=24)
-        t.add_column("Serie", key="series", width=26)
+        t.add_column("Titolo", key="title", width=30)
+        t.add_column("Autore", key="author", width=18)
+        t.add_column("Serie", key="series", width=20)
         t.add_column("Durata", key="dur", width=7)
         t.add_column("Ascolto", key="pct", width=8)
         self.books = sorted(self.api.cached_library(), key=lambda b: b.sort_key)
@@ -153,6 +163,67 @@ class AudibleApp(App):
             await self.mpris.start()
         except Exception as e:  # niente bus di sessione: si va avanti senza tasti multimediali
             self.status(f"MPRIS non attivo: {e}")
+
+    # --- pannello laterale ----------------------------------------------
+    def on_resize(self, ev: events.Resize) -> None:
+        t = self.query_one("#lib", DataTable)
+        if not t.columns:
+            return
+        # larghezza della tabella = schermo - pannello (44); tolgo colonne fisse e spaziatura
+        free = max(ev.size.width - 44 - 2 - 7 - 8 - 6 * 2 - 2, 30)  # colonne fisse e spaziatura
+        for key, share in (("title", 0.42), ("author", 0.26), ("series", 0.32)):
+            t.columns[ColumnKey(key)].width = max(int(free * share), 8)
+        t.refresh(layout=True)
+        self.call_after_refresh(self.update_side, True)
+
+    @on(DataTable.RowHighlighted)
+    def _highlighted(self) -> None:
+        self.update_side()
+
+    def side_target(self) -> Book | None:
+        return self.current or self.selected()
+
+    def update_side(self, force: bool = False) -> None:
+        b = self.side_target()
+        side = self.query_one("#side", Static)
+        if not b:
+            side.update("")
+            return
+        key = (b.asin, side.size.width, side.size.height)
+        if key == self._side_key and not force:
+            return
+        self._side_key = key
+        self.load_side(b, side.size.width - 3, side.size.height)
+
+    @work(thread=True, exclusive=True, group="side")
+    def load_side(self, b: Book, width: int, height: int) -> None:
+        path = get_cover(b)
+        self.call_from_thread(self.show_side, b, path, width, height)
+
+    def show_side(self, b: Book, path, width: int, height: int) -> None:
+        width = max(width, 10)
+        cols = max(min(width, 2 * (height - 12)) // 2 * 2, 8)
+        parts: list = []
+        used = 0
+        if path:
+            cover = render(str(path), cols)
+            cover.justify = "center"
+            parts.append(cover)
+            used = cols // 2
+        parts.append(Text(""))
+        parts.append(Text(b.title, style="bold"))
+        parts.append(Text(b.authors, style="italic"))
+        if b.narrators:
+            parts.append(Text.assemble(("Letto da ", "dim"), b.narrators))
+        if b.series:
+            parts.append(Text.assemble(("Serie ", "dim"), b.series + (f" #{b.seq}" if b.seq else "")))
+        parts.append(Text.assemble(("Durata ", "dim"), hm(b.minutes)))
+        room = height - used - 9 - len(b.title) // max(width, 1)
+        if b.summary and room > 1:
+            parts.append(Text(""))
+            parts.append(Text(b.summary[: room * width].rsplit(" ", 1)[0] + "…"
+                              if len(b.summary) > room * width else b.summary, style="dim"))
+        self.query_one("#side", Static).update(Group(*parts))
 
     # --- libreria -----------------------------------------------------
     @work(thread=True, exclusive=True, group="lib")
@@ -173,6 +244,7 @@ class AudibleApp(App):
     def set_library(self, books: list[Book], remote: dict[str, int]) -> None:
         self.books, self.remote = books, remote
         self.fill()
+        self.update_side(force=True)
         self.status(f"{len(books)} audiolibri")
 
     def shown(self) -> list[Book]:
@@ -295,6 +367,7 @@ class AudibleApp(App):
         self.player.load(b.path(), ms / 1000)
         self.last_sync = time.monotonic()
         self.last_synced_pos = -1
+        self.update_side()
         self.status(f"Riprendo da {hms(ms / 1000)}" if ms else "Parto dall'inizio")
 
     def action_toggle(self) -> None:

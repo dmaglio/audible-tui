@@ -33,6 +33,7 @@ class Book:
     finished: bool = False
     purchased: str = ""
     summary: str = ""
+    cover_url: str = ""
 
     @property
     def sort_key(self) -> tuple:
@@ -50,6 +51,12 @@ class Book:
         return None
 
 
+def _cover_url(images: dict) -> str:
+    if not images:
+        return ""
+    return images[max(images, key=lambda k: int(k) if k.isdigit() else 0)]
+
+
 def _book(i: dict) -> Book:
     ls = i.get("listening_status") or {}
     ser = (i.get("series") or [{}])[0]
@@ -64,7 +71,8 @@ def _book(i: dict) -> Book:
         percent=float(i.get("percent_complete") or ls.get("percent_complete") or 0),
         finished=bool(i.get("is_finished") or ls.get("is_finished")),
         purchased=(i.get("purchase_date") or "")[:10],
-        summary=re.sub(r"<[^>]+>", "", i.get("merchandising_summary") or ""),
+        summary=re.sub(r"<[^>]+>", "", i.get("merchandising_summary") or "").strip(),
+        cover_url=_cover_url(i.get("product_images") or {}),
     )
 
 

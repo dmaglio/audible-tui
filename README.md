@@ -6,6 +6,7 @@ Audible Italia (marketplace `it`) but usable with any marketplace the
 
 - browse your library (title, author, series, length, progress, downloaded)
 - download a book once, decrypt it locally to M4B (chapters and cover kept)
+- side panel with the cover (drawn in the terminal with half-block characters), title, author, narrator, series and blurb of what is playing (or of the selected book)
 - listen with mpv: chapters, speed, ±15 s / ±5 min, sleep timer
 - **listening position synced with Audible**: it resumes from where the web
   player or the phone app left you, and writes it back every 30 seconds, on
